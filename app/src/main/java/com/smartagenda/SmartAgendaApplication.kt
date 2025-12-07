@@ -20,10 +20,10 @@ class SmartAgendaApplication : Application(), Configuration.Provider {
         createNotificationChannel()
     }
 
-    override fun getWorkManagerConfiguration(): Configuration {
-        return Configuration.Builder()
-            .setWorkerFactory(workerFactory)
-            .build()
+    override val workManagerConfiguration: Configuration
+    get() = Configuration.Builder()
+        .setMinimumLoggingLevel(android.util.Log.INFO)
+        .build()
     }
 
     private fun createNotificationChannel() {
