@@ -1,0 +1,43 @@
+<resources>
+    <string name="app_name">SmartAgenda</string>
+    
+    <!-- Setup Screen -->
+    <string name="setup_title">Configuration SmartAgenda</string>
+    <string name="setup_subtitle">Configurez la connexion à votre serveur</string>
+    <string name="server_url_label">URL du serveur</string>
+    <string name="server_url_hint">http://192.168.1.100:8086</string>
+    <string name="server_url_helper">Assurez-vous que votre VPN est actif</string>
+    <string name="password_label">Mot de passe</string>
+    <string name="notification_time_label">Heure de notification</string>
+    <string name="notification_time_helper">Notification quotidienne</string>
+    <string name="test_connection">Tester la connexion</string>
+    <string name="save_configuration">Enregistrer la configuration</string>
+    
+    <!-- Home Screen -->
+    <string name="refresh">Actualiser</string>
+    <string name="loading">Chargement...</string>
+    <string name="connection_error">Erreur de connexion</string>
+    <string name="retry">Réessayer</string>
+    <string name="no_events">Aucun événement prévu</string>
+    <string name="events_of_day">Événements du jour</string>
+    <string name="last_sync">Dernière synchronisation: %s</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_name">Événements quotidiens</string>
+    <string name="notification_channel_description">Notifications des événements du jour</string>
+    <string name="events_today">%d événement(s) aujourd\'hui</string>
+    <string name="no_events_today">Pas d\'événement aujourd\'hui</string>
+    
+    <!-- Categories -->
+    <string name="category_work">Travail</string>
+    <string name="category_personal">Personnel</string>
+    <string name="category_meeting">Réunion</string>
+    <string name="category_leisure">Loisirs</string>
+    <string name="category_health">Santé</string>
+    
+    <!-- Error Messages -->
+    <string name="error_invalid_url">URL invalide. Format attendu: http://IP:8086</string>
+    <string name="error_password_too_short">Le mot de passe doit contenir au moins 8 caractères</string>
+    <string name="error_connection_failed">Impossible de se connecter. Vérifiez votre connexion VPN.</string>
+    <string name="error_auth_failed">Authentification échouée</string>
+</resources>
