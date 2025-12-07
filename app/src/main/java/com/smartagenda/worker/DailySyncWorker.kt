@@ -116,7 +116,7 @@ class DailySyncWorker @AssistedInject constructor(
             }
         }
 
-        val notification = NotificationCompat.Builder(applicationContext, SmartAgendaApplication.CHANNEL_ID)
+        val notification = NotificationCompat.Builder(applicationContext, SmartAgendaApplication.setChannelId("smartagenda_channel")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(message)
@@ -131,7 +131,7 @@ class DailySyncWorker @AssistedInject constructor(
     }
 
     private fun sendErrorNotification() {
-        val notification = NotificationCompat.Builder(applicationContext, SmartAgendaApplication.CHANNEL_ID)
+        val notification = NotificationCompat.Builder(applicationContext, SmartAgendaApplication.setChannelId("smartagenda_channel")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("⚠️ Synchronisation échouée")
             .setContentText("Impossible de récupérer les événements. Vérifiez votre connexion VPN.")
