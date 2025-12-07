@@ -141,7 +141,7 @@ class SetupViewModel @Inject constructor(
                     preferencesManager.setNotificationsEnabled(true)
 
                     // Planifier les synchronisations quotidiennes
-                    DailySyncWorker.schedule(
+                    WorkManagerScheduler.scheduleDailySync(context, hour, minute)
                         context,
                         _notificationHour.value,
                         _notificationMinute.value
