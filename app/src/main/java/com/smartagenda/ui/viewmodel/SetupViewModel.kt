@@ -5,29 +5,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartagenda.data.local.PreferencesManager
 import com.smartagenda.repository.SmartAgendaRepository
-import com.smartagenda.worker.DailySyncWorker
+import com.smartagenda.worker.WorkManagerScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * État de la configuration
- */
-sealed class SetupState {
-    object Idle : SetupState()
-    object Testing : SetupState()
-    object Authenticating : SetupState()
-    data class Success(val message: String) : SetupState()
-    data class Error(val message: String) : SetupState()
-}
+data class SetupUiState(
+    val serverUrl: String = "",
+    val password: String = "",
+    val notificationHour: Int = 7,
+    val notificationMinute: Int = 0,
+    val isLoading: Boolean = false,
+    val isTestingConnection: Boolean = false,
+    val connectionTestResult: String? = null,
+    val errorMessage: String? = null,
+    val isConfigured: Boolean = false
+)
 
-/**
- * ViewModel pour l'écran de configuration
- */
 @HiltViewModel
 class SetupViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -35,134 +31,140 @@ class SetupViewModel @Inject constructor(
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
-    private val _setupState = MutableStateFlow<SetupState>(SetupState.Idle)
-    val setupState: StateFlow<SetupState> = _setupState.asStateFlow()
-
-    private val _serverUrl = MutableStateFlow("")
-    val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
-
-    private val _password = MutableStateFlow("")
-    val password: StateFlow<String> = _password.asStateFlow()
-
-    private val _notificationHour = MutableStateFlow(7)
-    val notificationHour: StateFlow<Int> = _notificationHour.asStateFlow()
-
-    private val _notificationMinute = MutableStateFlow(0)
-    val notificationMinute: StateFlow<Int> = _notificationMinute.asStateFlow()
+    private val _uiState = MutableStateFlow(SetupUiState())
+    val uiState: StateFlow<SetupUiState> = _uiState.asStateFlow()
 
     init {
-        // Charger les valeurs existantes si disponibles
-        _serverUrl.value = preferencesManager.getServerUrl() ?: ""
-        _notificationHour.value = preferencesManager.getNotificationHour()
-        _notificationMinute.value = preferencesManager.getNotificationMinute()
+        viewModelScope.launch {
+            preferencesManager.isConfigured.collect { isConfigured ->
+                _uiState.update { it.copy(isConfigured = isConfigured) }
+            }
+        }
     }
 
-    fun setServerUrl(url: String) {
-        _serverUrl.value = url
+    fun updateServerUrl(url: String) {
+        _uiState.update { it.copy(serverUrl = url, errorMessage = null) }
     }
 
-    fun setPassword(password: String) {
-        _password.value = password
+    fun updatePassword(password: String) {
+        _uiState.update { it.copy(password = password, errorMessage = null) }
     }
 
-    fun setNotificationHour(hour: Int) {
-        _notificationHour.value = hour
+    fun updateNotificationTime(hour: Int, minute: Int) {
+        _uiState.update { 
+            it.copy(
+                notificationHour = hour,
+                notificationMinute = minute,
+                errorMessage = null
+            )
+        }
     }
 
-    fun setNotificationMinute(minute: Int) {
-        _notificationMinute.value = minute
-    }
-
-    /**
-     * Test de connexion au serveur
-     */
     fun testConnection() {
         viewModelScope.launch {
-            _setupState.value = SetupState.Testing
-
-            // Valider l'URL
-            val url = _serverUrl.value.trim()
-            if (!isValidUrl(url)) {
-                _setupState.value = SetupState.Error("URL invalide. Format attendu: http://IP:8086")
-                return@launch
-            }
-
-            // Sauvegarder temporairement l'URL pour le test
-            preferencesManager.setServerUrl(url)
-
-            repository.testConnection().fold(
-                onSuccess = {
-                    _setupState.value = SetupState.Success("✅ Connexion réussie au serveur !")
-                },
-                onFailure = { error ->
-                    _setupState.value = SetupState.Error(
-                        "❌ Impossible de se connecter. Vérifiez:\n" +
-                        "• Votre connexion VPN\n" +
-                        "• L'URL du serveur\n" +
-                        "• Que SmartAgenda est démarré\n\n" +
-                        "Erreur: ${error.message}"
+            _uiState.update { it.copy(isTestingConnection = true, connectionTestResult = null, errorMessage = null) }
+            
+            try {
+                val url = _uiState.value.serverUrl
+                val password = _uiState.value.password
+                
+                if (url.isBlank() || password.isBlank()) {
+                    _uiState.update { 
+                        it.copy(
+                            isTestingConnection = false,
+                            errorMessage = "Veuillez remplir tous les champs"
+                        )
+                    }
+                    return@launch
+                }
+                
+                val result = repository.testConnection(url, password)
+                
+                result.onSuccess {
+                    _uiState.update { 
+                        it.copy(
+                            isTestingConnection = false,
+                            connectionTestResult = "✅ Connexion réussie !"
+                        )
+                    }
+                }.onFailure { error ->
+                    _uiState.update { 
+                        it.copy(
+                            isTestingConnection = false,
+                            errorMessage = "Erreur : ${error.message}"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isTestingConnection = false,
+                        errorMessage = "Erreur : ${e.message}"
                     )
                 }
-            )
+            }
         }
     }
 
-    /**
-     * Sauvegarde la configuration complète
-     */
     fun saveConfiguration() {
         viewModelScope.launch {
-            val url = _serverUrl.value.trim()
-            val pwd = _password.value
-
-            // Validations
-            if (!isValidUrl(url)) {
-                _setupState.value = SetupState.Error("URL invalide")
-                return@launch
-            }
-
-            if (pwd.length < 8) {
-                _setupState.value = SetupState.Error("Le mot de passe doit contenir au moins 8 caractères")
-                return@launch
-            }
-
-            _setupState.value = SetupState.Authenticating
-
-            // Sauvegarder l'URL
-            preferencesManager.setServerUrl(url)
-
-            // Tenter l'authentification
-            repository.login(pwd).fold(
-                onSuccess = {
-                    // Sauvegarder les préférences
-                    preferencesManager.setPassword(pwd)
-                    preferencesManager.setNotificationHour(_notificationHour.value)
-                    preferencesManager.setNotificationMinute(_notificationMinute.value)
-                    preferencesManager.setNotificationsEnabled(true)
-
-                    // Planifier les synchronisations quotidiennes
-                    WorkManagerScheduler.scheduleDailySync(context, hour, minute)
-                        context,
-                        _notificationHour.value,
-                        _notificationMinute.value
-                    )
-
-                    _setupState.value = SetupState.Success("✅ Configuration enregistrée !")
-                },
-                onFailure = { error ->
-                    _setupState.value = SetupState.Error(
-                        "❌ Authentification échouée\n${error.message}"
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            
+            try {
+                val url = _uiState.value.serverUrl
+                val password = _uiState.value.password
+                val hour = _uiState.value.notificationHour
+                val minute = _uiState.value.notificationMinute
+                
+                if (url.isBlank()) {
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "L'URL du serveur est requise"
+                        )
+                    }
+                    return@launch
+                }
+                
+                if (password.length < 8) {
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "Le mot de passe doit contenir au moins 8 caractères"
+                        )
+                    }
+                    return@launch
+                }
+                
+                preferencesManager.saveServerUrl(url)
+                preferencesManager.savePassword(password)
+                preferencesManager.saveNotificationTime(hour, minute)
+                preferencesManager.setConfigured(true)
+                
+                WorkManagerScheduler.scheduleDailySync(context, hour, minute)
+                
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        isConfigured = true
                     )
                 }
-            )
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Erreur : ${e.message}"
+                    )
+                }
+            }
         }
     }
 
-    private fun isValidUrl(url: String): Boolean {
-        return url.matches(Regex("^https?://[\\w\\d.-]+(:\\d+)?/?$"))
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 
-    fun resetState() {
-        _setupState.value = SetupState.Idle
+    fun clearConnectionTestResult() {
+        _uiState.update { it.copy(connectionTestResult = null) }
     }
 }
