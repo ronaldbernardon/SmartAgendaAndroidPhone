@@ -5,12 +5,12 @@ import android.content.Context
 import android.content.Intent
 import com.smartagenda.data.local.PreferencesManager
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Receiver appelé au démarrage du téléphone
- * Réinitialise les tâches planifiées
- */
 @AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
 
@@ -19,13 +19,10 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            // Vérifier si l'application est configurée
-            if (preferencesManager.isConfigured() && preferencesManager.isNotificationsEnabled()) {
-                // Replanifier la synchronisation quotidienne
-                val hour = preferencesManager.getNotificationHour()
-                val minute = preferencesManager.getNotificationMinute()
-                
-                DailySyncWorker.schedule(context, hour, minute)
+            CoroutineScope(Dispatchers.IO).launch {
+                val hour = preferencesManager.notificationHour.first()
+                val minute = preferencesManager.notificationMinute.first()
+                WorkManagerScheduler.scheduleDailySync(context, hour, minute)
             }
         }
     }

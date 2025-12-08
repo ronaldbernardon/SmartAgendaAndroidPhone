@@ -36,8 +36,8 @@ class SetupViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            preferencesManager.isConfigured.collect { isConfigured ->
-                _uiState.update { it.copy(isConfigured = isConfigured) }
+            preferencesManager.isConfigured.collect { configured ->
+                _uiState.update { it.copy(isConfigured = configured) }
             }
         }
     }
@@ -78,7 +78,10 @@ class SetupViewModel @Inject constructor(
                     return@launch
                 }
                 
-                val result = repository.testConnection(url, password)
+                preferencesManager.updateServerUrl(url)
+                preferencesManager.updatePassword(password)
+                
+                val result = repository.testConnection()
                 
                 result.onSuccess {
                     _uiState.update { 
@@ -91,7 +94,7 @@ class SetupViewModel @Inject constructor(
                     _uiState.update { 
                         it.copy(
                             isTestingConnection = false,
-                            errorMessage = "Erreur : ${error.message}"
+                            errorMessage = "Erreur: ${error.message}"
                         )
                     }
                 }
@@ -99,7 +102,7 @@ class SetupViewModel @Inject constructor(
                 _uiState.update { 
                     it.copy(
                         isTestingConnection = false,
-                        errorMessage = "Erreur : ${e.message}"
+                        errorMessage = "Erreur: ${e.message}"
                     )
                 }
             }
@@ -136,10 +139,10 @@ class SetupViewModel @Inject constructor(
                     return@launch
                 }
                 
-                preferencesManager.saveServerUrl(url)
-                preferencesManager.savePassword(password)
-                preferencesManager.saveNotificationTime(hour, minute)
-                preferencesManager.setConfigured(true)
+                preferencesManager.updateServerUrl(url)
+                preferencesManager.updatePassword(password)
+                preferencesManager.updateNotificationTime(hour, minute)
+                preferencesManager.updateConfigured(true)
                 
                 WorkManagerScheduler.scheduleDailySync(context, hour, minute)
                 
@@ -153,7 +156,7 @@ class SetupViewModel @Inject constructor(
                 _uiState.update { 
                     it.copy(
                         isLoading = false,
-                        errorMessage = "Erreur : ${e.message}"
+                        errorMessage = "Erreur: ${e.message}"
                     )
                 }
             }

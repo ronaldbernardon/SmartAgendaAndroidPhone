@@ -41,14 +41,14 @@ class DailySyncWorker @AssistedInject constructor(
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
         val title = when {
-            eventCount == 1 -> "1 événement aujourd'hui"
-            else -> "$eventCount événements aujourd'hui"
+            eventCount == 1 -> "1 evenement aujourd'hui"
+            else -> "$eventCount evenements aujourd'hui"
         }
         
         val notification = NotificationCompat.Builder(applicationContext, "smartagenda_channel")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
-            .setContentText("Ouvrez SmartAgenda pour voir vos événements")
+            .setContentText("Ouvrez SmartAgenda pour voir vos evenements")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
