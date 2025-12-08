@@ -1,5 +1,6 @@
 package com.smartagenda.ui.viewmodel
 
+import kotlinx.coroutines.runBlocking
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartagenda.data.local.PreferencesManager

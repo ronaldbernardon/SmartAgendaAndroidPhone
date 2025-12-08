@@ -1,5 +1,6 @@
 package com.smartagenda.di
 
+import kotlinx.coroutines.runBlocking
 import android.content.Context
 import androidx.room.Room
 import com.google.gson.Gson
