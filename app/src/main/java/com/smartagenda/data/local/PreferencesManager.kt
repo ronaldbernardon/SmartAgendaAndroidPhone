@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,6 +25,7 @@ class PreferencesManager @Inject constructor(
         private val NOTIFICATION_HOUR = intPreferencesKey("notification_hour")
         private val NOTIFICATION_MINUTE = intPreferencesKey("notification_minute")
         private val IS_CONFIGURED = booleanPreferencesKey("is_configured")
+        private val LAST_SYNC_TIMESTAMP = longPreferencesKey("last_sync_timestamp")
     }
 
     val serverUrl: Flow<String> = dataStore.data.map { preferences ->
@@ -46,6 +48,20 @@ class PreferencesManager @Inject constructor(
         preferences[IS_CONFIGURED] ?: false
     }
 
+    val isConfiguredFlow: Flow<Boolean> = isConfigured
+
+    suspend fun getServerUrl(): String {
+        return serverUrl.first()
+    }
+
+    suspend fun getPassword(): String {
+        return password.first()
+    }
+
+    suspend fun getLastSyncTimestamp(): Long {
+        return dataStore.data.map { it[LAST_SYNC_TIMESTAMP] ?: 0L }.first()
+    }
+
     suspend fun updateServerUrl(url: String) {
         dataStore.edit { preferences ->
             preferences[SERVER_URL] = url
@@ -58,6 +74,10 @@ class PreferencesManager @Inject constructor(
         }
     }
 
+    suspend fun setPassword(password: String) {
+        updatePassword(password)
+    }
+
     suspend fun updateNotificationTime(hour: Int, minute: Int) {
         dataStore.edit { preferences ->
             preferences[NOTIFICATION_HOUR] = hour
@@ -68,6 +88,12 @@ class PreferencesManager @Inject constructor(
     suspend fun updateConfigured(configured: Boolean) {
         dataStore.edit { preferences ->
             preferences[IS_CONFIGURED] = configured
+        }
+    }
+
+    suspend fun setLastSyncTimestamp(timestamp: Long) {
+        dataStore.edit { preferences ->
+            preferences[LAST_SYNC_TIMESTAMP] = timestamp
         }
     }
 }
