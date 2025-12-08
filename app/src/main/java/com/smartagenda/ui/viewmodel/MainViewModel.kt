@@ -83,6 +83,6 @@ class MainViewModel @Inject constructor(
     }
 
     fun getLastSyncTime(): Long {
-        return preferencesManager.getLastSyncTimestamp()
+        return runBlocking { preferencesManager.getLastSyncTimestamp() }
     }
 }
