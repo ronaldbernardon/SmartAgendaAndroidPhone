@@ -84,7 +84,7 @@ class SetupViewModel @Inject constructor(
                     _uiState.update { 
                         it.copy(
                             isTestingConnection = false,
-                            connectionTestResult = "✅ Connexion réussie !"
+                            connectionTestResult = "Connexion reussie"
                         )
                     }
                 }.onFailure { error ->
@@ -120,7 +120,7 @@ class SetupViewModel @Inject constructor(
                     _uiState.update { 
                         it.copy(
                             isLoading = false,
-                            errorMessage = "L'URL du serveur est requise"
+                            errorMessage = "URL du serveur requise"
                         )
                     }
                     return@launch
@@ -130,7 +130,7 @@ class SetupViewModel @Inject constructor(
                     _uiState.update { 
                         it.copy(
                             isLoading = false,
-                            errorMessage = "Le mot de passe doit contenir au moins 8 caractères"
+                            errorMessage = "Mot de passe trop court"
                         )
                     }
                     return@launch
