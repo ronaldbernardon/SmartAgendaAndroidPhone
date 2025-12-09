@@ -19,24 +19,27 @@ data class Event(
     val StartDate: String? = null
 )
 
-// Daily Summary for HomeScreen
+// Daily Summary for HomeScreen avec TOUS les champs
 data class DailySummary(
     val date: String,
     val events: List<Event>,
     val isFerie: Boolean = false,
-    val ferieName: String? = null,
+    val ferieNom: String? = null,
     val isConge: Boolean = false,
-    val congeName: String? = null,
-    val weather: WeatherData? = null,
-    val uv: UVData? = null
+    val congeNom: String? = null,
+    val weatherData: WeatherData? = null,
+    val uvData: UVData? = null,
+    val lastUpdated: String? = null
 )
 
-// Weather data
+// Weather data avec TOUS les champs
 data class WeatherData(
     val tempMin: Double,
     val tempMax: Double,
-    val description: String,
-    val icon: String
+    val weatherCode: Int? = null,
+    val weatherDescription: String,
+    val icon: String,
+    val date: String? = null
 )
 
 // API Response types
