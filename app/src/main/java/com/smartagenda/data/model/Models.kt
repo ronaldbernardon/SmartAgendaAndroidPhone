@@ -19,6 +19,26 @@ data class Event(
     val StartDate: String? = null
 )
 
+// Daily Summary for HomeScreen
+data class DailySummary(
+    val date: String,
+    val events: List<Event>,
+    val isFerie: Boolean = false,
+    val ferieName: String? = null,
+    val isConge: Boolean = false,
+    val congeName: String? = null,
+    val weather: WeatherData? = null,
+    val uv: UVData? = null
+)
+
+// Weather data
+data class WeatherData(
+    val tempMin: Double,
+    val tempMax: Double,
+    val description: String,
+    val icon: String
+)
+
 // API Response types
 data class ApiResponse(
     val success: Boolean,
@@ -74,8 +94,8 @@ data class UVResponse(
 
 data class UVData(
     val date: String,
-    val uv_index: Double,
-    val level_info: UVLevelInfo
+    val uvIndex: Double,
+    val levelInfo: UVLevelInfo
 )
 
 data class UVLevelInfo(
