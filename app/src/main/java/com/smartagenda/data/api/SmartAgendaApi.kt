@@ -13,7 +13,7 @@ interface SmartAgendaApi {
     suspend fun getUpcomingEvents(): Response<EventsResponse>
     
     @GET("api/events/day")
-    suspend fun getEventsByDate(@Query("date") date: String): Response<EventsResponse>
+    suspend fun getEventsForDay(@Query("date") date: String): Response<EventsResponse>
     
     @POST("api/events")
     suspend fun createEvent(@Body event: EventRequest): Response<ApiResponse>
@@ -26,13 +26,24 @@ interface SmartAgendaApi {
     
     @GET("api/notifications/pending")
     suspend fun getPendingNotifications(): Response<NotificationsResponse>
+    
+    @GET("api/feries")
+    suspend fun checkFerie(@Query("date") date: String): Response<FerieResponse>
+    
+    @GET("api/conges")
+    suspend fun checkConge(@Query("date") date: String): Response<CongeResponse>
+    
+    @GET("api/uv/today")
+    suspend fun getUVToday(): Response<UVResponse>
+    
+    @GET("api/weather/date")
+    suspend fun getWeatherForDate(@Query("date") date: String): Response<WeatherResponse>
+    
+    @GET("/")
+    suspend fun healthCheck(): Response<HealthResponse>
 }
 
 // Request data classes
-data class LoginRequest(
-    val password: String
-)
-
 data class EventRequest(
     val title: String,
     val description: String? = null,

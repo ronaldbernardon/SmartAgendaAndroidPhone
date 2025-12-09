@@ -7,7 +7,7 @@ import com.smartagenda.data.local.PreferencesManager
 import com.smartagenda.repository.SmartAgendaRepository
 import com.smartagenda.worker.WorkManagerScheduler
 import com.smartagenda.data.api.SmartAgendaApi
-import com.smartagenda.data.api.LoginRequest
+import com.smartagenda.data.model.LoginRequest
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -84,7 +84,13 @@ fun testConnection(serverUrl: String, password: String) {
                 _uiState.update { 
                     it.copy(
                         isLoading = false,
-                        connectionTested = true,
+                        _uiState.update { 
+	    it.copy(
+        	isLoading = false,
+        	errorMessage = null
+		    )
+		}
+
                         errorMessage = null
                     )
                 }
