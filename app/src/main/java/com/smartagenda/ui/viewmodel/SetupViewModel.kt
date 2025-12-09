@@ -6,6 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.smartagenda.data.local.PreferencesManager
 import com.smartagenda.repository.SmartAgendaRepository
 import com.smartagenda.worker.WorkManagerScheduler
+import com.smartagenda.data.api.SmartAgendaApi
+import com.smartagenda.data.api.LoginRequest
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
@@ -60,54 +64,48 @@ class SetupViewModel @Inject constructor(
         }
     }
 
-    fun testConnection() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isTestingConnection = true, connectionTestResult = null, errorMessage = null) }
+fun testConnection(serverUrl: String, password: String) {
+    viewModelScope.launch {
+        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+        
+        try {
+            // Créer une instance temporaire de Retrofit pour tester
+            val retrofit = Retrofit.Builder()
+                .baseUrl(serverUrl)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
             
-            try {
-                val url = _uiState.value.serverUrl
-                val password = _uiState.value.password
-                
-                if (url.isBlank() || password.isBlank()) {
-                    _uiState.update { 
-                        it.copy(
-                            isTestingConnection = false,
-                            errorMessage = "Veuillez remplir tous les champs"
-                        )
-                    }
-                    return@launch
-                }
-                
-                preferencesManager.updateServerUrl(url)
-                preferencesManager.updatePassword(password)
-                
-                val result = repository.testConnection()
-                
-                result.onSuccess {
-                    _uiState.update { 
-                        it.copy(
-                            isTestingConnection = false,
-                            connectionTestResult = "Connexion reussie"
-                        )
-                    }
-                }.onFailure { error ->
-                    _uiState.update { 
-                        it.copy(
-                            isTestingConnection = false,
-                            errorMessage = "Erreur: ${error.message}"
-                        )
-                    }
-                }
-            } catch (e: Exception) {
+            val api = retrofit.create(SmartAgendaApi::class.java)
+            
+            // Tester la connexion
+            val response = api.login(LoginRequest(password))
+            
+            if (response.isSuccessful && response.body()?.success == true) {
                 _uiState.update { 
                     it.copy(
-                        isTestingConnection = false,
-                        errorMessage = "Erreur: ${e.message}"
+                        isLoading = false,
+                        connectionTested = true,
+                        errorMessage = null
+                    )
+                }
+            } else {
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = response.body()?.message ?: "Mot de passe incorrect"
                     )
                 }
             }
+        } catch (e: Exception) {
+            _uiState.update { 
+                it.copy(
+                    isLoading = false,
+                    errorMessage = "Erreur: ${e.message}"
+                )
+            }
         }
     }
+}
 
     fun saveConfiguration() {
         viewModelScope.launch {
