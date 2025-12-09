@@ -1,8 +1,12 @@
 package com.smartagenda.data.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 // Event data classes
+@Entity(tableName = "events")
 data class Event(
-    val Id: String,
+    @PrimaryKey val Id: String,
     val Title: String,
     val Description: String?,
     val Category: String,
