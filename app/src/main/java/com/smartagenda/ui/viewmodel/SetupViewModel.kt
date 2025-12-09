@@ -1,19 +1,18 @@
 package com.smartagenda.ui.viewmodel
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.smartagenda.data.local.PreferencesManager
-import com.smartagenda.repository.SmartAgendaRepository
-import com.smartagenda.worker.WorkManagerScheduler
 import com.smartagenda.data.api.SmartAgendaApi
+import com.smartagenda.data.local.PreferencesManager
 import com.smartagenda.data.model.LoginRequest
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class SetupUiState(
@@ -22,139 +21,95 @@ data class SetupUiState(
     val notificationHour: Int = 7,
     val notificationMinute: Int = 0,
     val isLoading: Boolean = false,
-    val isTestingConnection: Boolean = false,
-    val connectionTestResult: String? = null,
     val errorMessage: String? = null,
-    val isConfigured: Boolean = false
+    val isSaved: Boolean = false
 )
 
 @HiltViewModel
 class SetupViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val repository: SmartAgendaRepository,
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
-
+    
     private val _uiState = MutableStateFlow(SetupUiState())
     val uiState: StateFlow<SetupUiState> = _uiState.asStateFlow()
-
+    
     init {
+        loadSettings()
+    }
+    
+    private fun loadSettings() {
         viewModelScope.launch {
-            preferencesManager.isConfigured.collect { configured ->
-                _uiState.update { it.copy(isConfigured = configured) }
+            preferencesManager.serverUrl.collect { url ->
+                _uiState.update { it.copy(serverUrl = url) }
+            }
+        }
+        
+        viewModelScope.launch {
+            preferencesManager.password.collect { pwd ->
+                _uiState.update { it.copy(password = pwd) }
+            }
+        }
+        
+        viewModelScope.launch {
+            preferencesManager.notificationHour.collect { hour ->
+                _uiState.update { it.copy(notificationHour = hour) }
+            }
+        }
+        
+        viewModelScope.launch {
+            preferencesManager.notificationMinute.collect { minute ->
+                _uiState.update { it.copy(notificationMinute = minute) }
             }
         }
     }
-
+    
     fun updateServerUrl(url: String) {
-        _uiState.update { it.copy(serverUrl = url, errorMessage = null) }
+        _uiState.update { it.copy(serverUrl = url) }
     }
-
+    
     fun updatePassword(password: String) {
-        _uiState.update { it.copy(password = password, errorMessage = null) }
+        _uiState.update { it.copy(password = password) }
     }
-
+    
     fun updateNotificationTime(hour: Int, minute: Int) {
         _uiState.update { 
             it.copy(
                 notificationHour = hour,
-                notificationMinute = minute,
-                errorMessage = null
+                notificationMinute = minute
             )
         }
     }
-
-fun testConnection(serverUrl: String, password: String) {
-    viewModelScope.launch {
-        _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        
-        try {
-            // Créer une instance temporaire de Retrofit pour tester
-            val retrofit = Retrofit.Builder()
-                .baseUrl(serverUrl)
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-            
-            val api = retrofit.create(SmartAgendaApi::class.java)
-            
-            // Tester la connexion
-            val response = api.login(LoginRequest(password))
-            
-            if (response.isSuccessful && response.body()?.success == true) {
-                _uiState.update { 
-                    it.copy(
-                        isLoading = false,
-                        _uiState.update { 
-	    it.copy(
-        	isLoading = false,
-        	errorMessage = null
-		    )
-		}
-
-                        errorMessage = null
-                    )
-                }
-            } else {
-                _uiState.update { 
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = response.body()?.message ?: "Mot de passe incorrect"
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            _uiState.update { 
-                it.copy(
-                    isLoading = false,
-                    errorMessage = "Erreur: ${e.message}"
-                )
-            }
-        }
-    }
-}
-
-    fun saveConfiguration() {
+    
+    fun testConnection(serverUrl: String, password: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             
             try {
-                val url = _uiState.value.serverUrl
-                val password = _uiState.value.password
-                val hour = _uiState.value.notificationHour
-                val minute = _uiState.value.notificationMinute
+                // Créer une instance temporaire de Retrofit pour tester
+                val retrofit = Retrofit.Builder()
+                    .baseUrl(serverUrl)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
                 
-                if (url.isBlank()) {
+                val api = retrofit.create(SmartAgendaApi::class.java)
+                
+                // Tester la connexion
+                val response = api.login(LoginRequest(password))
+                
+                if (response.isSuccessful && response.body()?.success == true) {
                     _uiState.update { 
                         it.copy(
                             isLoading = false,
-                            errorMessage = "URL du serveur requise"
+                            errorMessage = null
                         )
                     }
-                    return@launch
-                }
-                
-                if (password.length < 8) {
+                } else {
                     _uiState.update { 
                         it.copy(
                             isLoading = false,
-                            errorMessage = "Mot de passe trop court"
+                            errorMessage = response.body()?.message ?: "Mot de passe incorrect"
                         )
                     }
-                    return@launch
-                }
-                
-                preferencesManager.updateServerUrl(url)
-                preferencesManager.updatePassword(password)
-                preferencesManager.updateNotificationTime(hour, minute)
-                preferencesManager.updateConfigured(true)
-                
-                WorkManagerScheduler.scheduleDailySync(context, hour, minute)
-                
-                _uiState.update { 
-                    it.copy(
-                        isLoading = false,
-                        isConfigured = true
-                    )
                 }
             } catch (e: Exception) {
                 _uiState.update { 
@@ -166,12 +121,36 @@ fun testConnection(serverUrl: String, password: String) {
             }
         }
     }
-
-    fun clearError() {
-        _uiState.update { it.copy(errorMessage = null) }
-    }
-
-    fun clearConnectionTestResult() {
-        _uiState.update { it.copy(connectionTestResult = null) }
+    
+    fun saveSettings() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            
+            try {
+                val state = _uiState.value
+                
+                preferencesManager.updateServerUrl(state.serverUrl)
+                preferencesManager.updatePassword(state.password)
+                preferencesManager.updateNotificationTime(
+                    state.notificationHour,
+                    state.notificationMinute
+                )
+                preferencesManager.updateConfigured(true)
+                
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        isSaved = true
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Erreur sauvegarde: ${e.message}"
+                    )
+                }
+            }
+        }
     }
 }
