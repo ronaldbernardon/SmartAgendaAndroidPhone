@@ -85,15 +85,12 @@ class SetupViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             
             try {
-                // Créer une instance temporaire de Retrofit pour tester
                 val retrofit = Retrofit.Builder()
                     .baseUrl(serverUrl)
                     .addConverterFactory(GsonConverterFactory.create())
                     .build()
                 
                 val api = retrofit.create(SmartAgendaApi::class.java)
-                
-                // Tester la connexion
                 val response = api.login(LoginRequest(password))
                 
                 if (response.isSuccessful && response.body()?.success == true) {
