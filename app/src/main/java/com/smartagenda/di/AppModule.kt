@@ -70,8 +70,8 @@ object AppModule {
         preferencesManager: PreferencesManager
     ): Retrofit {
         // Utiliser l'URL depuis les préférences ou une URL par défaut
-        val baseUrl = runBlocking { preferencesManager.getServerUrl() } ?: "http://localhost:8086/"
-
+        val serverUrl = runBlocking { preferencesManager.getServerUrl() }
+	val baseUrl = if (serverUrl.isNullOrEmpty()) "http://localhost:8086/" else serverUrl
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(okHttpClient)
