@@ -1,217 +1,127 @@
-package com.smartagenda.repository
+package com.smartagenda.data.repository
 
-import com.smartagenda.data.api.SmartAgendaApi
+import android.util.Log
 import com.smartagenda.data.local.EventDao
 import com.smartagenda.data.local.PreferencesManager
-import com.smartagenda.data.model.*
+import com.smartagenda.data.model.DailySummary
+import com.smartagenda.data.model.Event
+import com.smartagenda.data.network.SmartAgendaApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Repository pour gérer les données SmartAgenda
- * Gère le cache local et les appels API
- */
 @Singleton
 class SmartAgendaRepository @Inject constructor(
     private val api: SmartAgendaApi,
     private val eventDao: EventDao,
     private val preferencesManager: PreferencesManager
 ) {
-
-    private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-
-    /**
-     * Récupère le résumé complet du jour
-     */
-    fun getDailySummary(date: LocalDate = LocalDate.now()): Flow<Result<DailySummary>> = flow {
-        val dateString = date.format(dateFormatter)
-
+    
+    suspend fun getDailySummary(date: String): Flow<Result<DailySummary>> = flow {
         try {
-            // Récupérer toutes les données en parallèle
-            val events = fetchEvents(dateString)
-            val uvData = fetchUVData()
-            val weatherData = fetchWeatherData(dateString)
-            val ferieData = fetchFerieData(dateString)
-            val congeData = fetchCongeData(dateString)
-
+            Log.d("Repository", "Chargement du résumé pour: $date")
+            
+            // Appel API pour les événements du jour
+            val eventsResponse = api.getEventsForDay(date)
+            val events = eventsResponse.events ?: emptyList()
+            
+            Log.d("Repository", "Événements reçus: ${events.size}")
+            
+            // Appel API pour l'indice UV
+            var uvIndex: Double? = null
+            var uvLevel: String? = null
+            try {
+                val uvResponse = api.getUVForDate(date)
+                if (uvResponse.success == true) {
+                    uvIndex = uvResponse.uvIndex
+                    uvLevel = uvResponse.level
+                    Log.d("Repository", "UV: $uvIndex ($uvLevel)")
+                }
+            } catch (e: Exception) {
+                Log.w("Repository", "Erreur UV: ${e.message}")
+            }
+            
+            // Appel API pour la météo
+            var tempMin: Double? = null
+            var tempMax: Double? = null
+            var weatherDescription: String? = null
+            var weatherIcon: String? = null
+            try {
+                val weatherResponse = api.getWeatherForDate(date)
+                if (weatherResponse.success == true) {
+                    tempMin = weatherResponse.tempMin
+                    tempMax = weatherResponse.tempMax
+                    weatherDescription = weatherResponse.weatherDescription
+                    weatherIcon = weatherResponse.icon
+                    Log.d("Repository", "Météo: ${tempMin}°/${tempMax}° - $weatherDescription")
+                }
+            } catch (e: Exception) {
+                Log.w("Repository", "Erreur météo: ${e.message}")
+            }
+            
+            // Sauvegarder les événements en cache
+            eventDao.insertEvents(events)
+            
             // Créer le résumé
             val summary = DailySummary(
-                date = dateString,
-                events = events ?: emptyList(),
-                uvData = uvData,
-                weatherData = weatherData,
-                ferieNom = if (ferieData?.ferie == true) ferieData.nom else null,
-                congeNom = if (congeData?.conge == true) congeData.nom else null
+                date = date,
+                dateFormatted = formatDate(date),
+                totalEvents = events.size,
+                events = events,
+                uvIndex = uvIndex,
+                uvLevel = uvLevel,
+                tempMin = tempMin,
+                tempMax = tempMax,
+                weatherDescription = weatherDescription,
+                weatherIcon = weatherIcon,
+                lastUpdated = System.currentTimeMillis()
             )
-
-            // Mettre à jour le cache
-            if (events != null && events.isNotEmpty()) {
-                eventDao.insertEvents(events)
-            }
-
-            preferencesManager.setLastSyncTimestamp(System.currentTimeMillis())
-
+            
+            Log.d("Repository", "Résumé créé avec succès")
             emit(Result.success(summary))
-
+            
         } catch (e: Exception) {
-            // En cas d'erreur, essayer de charger depuis le cache
-            val cachedEvents = try {
-                eventDao.getEventsForDate(dateString)
-            } catch (_: Exception) {
-                null
-            }
-
-            if (cachedEvents != null) {
-                emit(Result.success(DailySummary(
-                    date = dateString,
-                    events = emptyList(),
-                    uvData = null,
-                    weatherData = null,
-                    ferieNom = null,
-                    congeNom = null,
-                    lastUpdated = preferencesManager.getLastSyncTimestamp()
-                )))
-            } else {
+            Log.e("Repository", "Erreur: ${e.message}", e)
+            
+            // Fallback: charger depuis le cache
+            try {
+                val cachedEvents = eventDao.getEventsForDate(date).first()
+                
+                val summary = DailySummary(
+                    date = date,
+                    dateFormatted = formatDate(date),
+                    totalEvents = cachedEvents.size,
+                    events = cachedEvents,
+                    uvIndex = null,
+                    uvLevel = null,
+                    tempMin = null,
+                    tempMax = null,
+                    weatherDescription = null,
+                    weatherIcon = null,
+                    lastUpdated = null
+                )
+                
+                Log.d("Repository", "Chargé depuis le cache: ${cachedEvents.size} événements")
+                emit(Result.success(summary))
+            } catch (cacheError: Exception) {
+                Log.e("Repository", "Erreur cache: ${cacheError.message}")
                 emit(Result.failure(e))
             }
         }
     }
-
-    /**
-     * Récupère les événements d'un jour
-     */
-    private suspend fun fetchEvents(date: String): List<Event>? {
+    
+    private fun formatDate(dateStr: String): String {
         return try {
-            val response = api.getEventsForDay(date)
-            if (response.isSuccessful) {
-                response.body()?.events
-            } else {
-                null
-            }
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.FRENCH)
+            val outputFormat = SimpleDateFormat("EEEE d MMMM yyyy", Locale.FRENCH)
+            val date = inputFormat.parse(dateStr)
+            date?.let { outputFormat.format(it) } ?: dateStr
         } catch (e: Exception) {
-            null
+            dateStr
         }
-    }
-
-    /**
-     * Récupère les données UV
-     */
-    private suspend fun fetchUVData(): UVData? {
-        return try {
-            val response = api.getUVToday()
-            if (response.isSuccessful) {
-                response.body()?.uvData
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Récupère les données météo
-     */
-    private suspend fun fetchWeatherData(date: String): WeatherData? {
-        return try {
-            val response = api.getWeatherForDate(date)
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body?.success == true && body.tempMin != null && body.tempMax != null) {
-                    WeatherData(
-                        tempMin = body.tempMin,
-                        tempMax = body.tempMax,
-                        weatherCode = 0,
-                        weatherDescription = body.weatherDescription ?: "",
-                        icon = body.icon ?: "",
-                        date = date
-                    )
-                } else null
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Vérifie si le jour est férié
-     */
-    private suspend fun fetchFerieData(date: String): FerieResponse? {
-        return try {
-            val response = api.checkFerie(date)
-            if (response.isSuccessful) {
-                response.body()
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Vérifie si le jour est en congés scolaires
-     */
-    private suspend fun fetchCongeData(date: String): CongeResponse? {
-        return try {
-            val response = api.checkConge(date)
-            if (response.isSuccessful) {
-                response.body()
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Authentification
-     */
-    suspend fun login(password: String): Result<Boolean> {
-        return try {
-            val response = api.login(LoginRequest(password))
-            if (response.isSuccessful && response.body()?.success == true) {
-                preferencesManager.setPassword(password)
-                Result.success(true)
-            } else {
-                Result.failure(Exception(response.body()?.message ?: "Authentification échouée"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Test de connexion
-     */
-    suspend fun testConnection(): Result<Boolean> {
-        return try {
-            val response = api.healthCheck()
-            Result.success(response.isSuccessful)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Récupère les événements du cache
-     */
-    fun getCachedEventsForDate(date: LocalDate): Flow<List<Event>> {
-        return eventDao.getEventsForDate(date.format(dateFormatter))
-    }
-
-    /**
-     * Nettoie les anciens événements du cache (> 7 jours)
-     */
-    suspend fun cleanOldCache() {
-        val cutoffDate = LocalDate.now().minusDays(7).format(dateFormatter)
-        eventDao.deleteOldEvents(cutoffDate)
     }
 }

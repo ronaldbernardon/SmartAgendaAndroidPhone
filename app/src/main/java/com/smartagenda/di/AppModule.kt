@@ -1,22 +1,20 @@
 package com.smartagenda.di
 
-import kotlinx.coroutines.runBlocking
 import android.content.Context
 import androidx.room.Room
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
-import com.smartagenda.data.api.SmartAgendaApi
+import com.smartagenda.data.local.AppDatabase
 import com.smartagenda.data.local.EventDao
 import com.smartagenda.data.local.PreferencesManager
-import com.smartagenda.data.local.SmartAgendaDatabase
+import com.smartagenda.data.network.SmartAgendaApi
+import com.smartagenda.data.repository.SmartAgendaRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import okhttp3.Interceptor
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -25,87 +23,76 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-
+    
     @Provides
     @Singleton
-    fun provideGson(): Gson {
-        return GsonBuilder()
-            .setLenient()
-            .create()
+    fun providePreferencesManager(
+        @ApplicationContext context: Context
+    ): PreferencesManager {
+        return PreferencesManager(context)
     }
-
+    
     @Provides
     @Singleton
-    fun provideOkHttpClient(
-        preferencesManager: PreferencesManager
-    ): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
-
-        // Intercepteur pour ajouter les cookies de session si nécessaire
-        val authInterceptor = Interceptor { chain ->
-            val original = chain.request()
-            val requestBuilder = original.newBuilder()
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json")
-
-            chain.proceed(requestBuilder.build())
-        }
-
+    fun provideOkHttpClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(authInterceptor)
-            .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
-
+    
     @Provides
     @Singleton
     fun provideRetrofit(
         okHttpClient: OkHttpClient,
-        gson: Gson,
         preferencesManager: PreferencesManager
     ): Retrofit {
-        // Utiliser l'URL depuis les préférences ou une URL par défaut
-        val serverUrl = runBlocking { preferencesManager.getServerUrl() }
-	val baseUrl = if (serverUrl.isNullOrEmpty()) "http://localhost:8086/" else serverUrl
+        // Récupérer l'URL depuis les préférences de manière synchrone
+        val baseUrl = runBlocking {
+            preferencesManager.serverUrl.first().ifEmpty { "http://192.168.1.2:8086/" }
+        }
+        
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create(gson))
+            .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
-
+    
     @Provides
     @Singleton
     fun provideSmartAgendaApi(retrofit: Retrofit): SmartAgendaApi {
         return retrofit.create(SmartAgendaApi::class.java)
     }
-
+    
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): SmartAgendaDatabase {
+    fun provideAppDatabase(
+        @ApplicationContext context: Context
+    ): AppDatabase {
         return Room.databaseBuilder(
             context,
-            SmartAgendaDatabase::class.java,
-            "smartagenda_db"
+            AppDatabase::class.java,
+            "smartagenda_database"
         )
             .fallbackToDestructiveMigration()
             .build()
     }
-
+    
     @Provides
     @Singleton
-    fun provideEventDao(database: SmartAgendaDatabase): EventDao {
+    fun provideEventDao(database: AppDatabase): EventDao {
         return database.eventDao()
     }
-
+    
     @Provides
     @Singleton
-    fun providePreferencesManager(@ApplicationContext context: Context): PreferencesManager {
-        return PreferencesManager(context)
+    fun provideSmartAgendaRepository(
+        api: SmartAgendaApi,
+        eventDao: EventDao,
+        preferencesManager: PreferencesManager
+    ): SmartAgendaRepository {
+        return SmartAgendaRepository(api, eventDao, preferencesManager)
     }
 }
