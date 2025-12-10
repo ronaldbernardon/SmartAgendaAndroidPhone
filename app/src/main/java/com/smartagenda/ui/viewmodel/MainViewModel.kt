@@ -46,6 +46,7 @@ class MainViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             preferencesManager.isConfiguredFlow.collect { configured ->
+                android.util.Log.d("MainViewModel", "isConfigured = $configured")
                 if (configured) {
                     loadDailySummary()
                 } else {
@@ -87,3 +88,4 @@ class MainViewModel @Inject constructor(
         return runBlocking { preferencesManager.getLastSyncTimestamp() }
     }
 }
+
