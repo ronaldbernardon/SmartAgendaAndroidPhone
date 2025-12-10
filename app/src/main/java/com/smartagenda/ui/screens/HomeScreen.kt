@@ -230,7 +230,7 @@ fun DailySummaryContent(
         // Dernière mise à jour
         item {
             Text(
-                text = "Dernière synchronisation: ${formatLastSync(summary.lastUpdated)}",
+                text = "Dernière synchronisation: ${formatLastSync(summary.lastUpdated ?: 0L)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)
