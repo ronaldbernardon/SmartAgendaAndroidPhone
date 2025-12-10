@@ -7,26 +7,27 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.core.view.WindowCompat
+import com.smartagenda.data.local.PreferencesManager
 import com.smartagenda.ui.SmartAgendaApp
-import com.smartagenda.ui.theme.SmartAgendaAndroidTheme
+import com.smartagenda.ui.theme.SmartAgendaTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    
+    @Inject
+    lateinit var preferencesManager: PreferencesManager
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Activer le edge-to-edge
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        
         setContent {
-            SmartAgendaAndroidTheme {
+            SmartAgendaTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SmartAgendaApp()
+                    SmartAgendaApp(preferencesManager = preferencesManager)
                 }
             }
         }

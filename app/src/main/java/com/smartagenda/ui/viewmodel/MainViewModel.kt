@@ -1,94 +1,81 @@
 package com.smartagenda.ui.viewmodel
 
-import kotlinx.coroutines.runBlocking
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.smartagenda.data.local.PreferencesManager
 import com.smartagenda.data.model.DailySummary
-import com.smartagenda.repository.SmartAgendaRepository
-import com.smartagenda.worker.DailySyncWorker
+import com.smartagenda.data.repository.SmartAgendaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.*
 import javax.inject.Inject
 
-/**
- * État de l'UI pour l'écran principal
- */
-sealed class MainUiState {
-    object Loading : MainUiState()
-    data class Success(val summary: DailySummary) : MainUiState()
-    data class Error(val message: String) : MainUiState()
-    object NotConfigured : MainUiState()
-}
+data class MainUiState(
+    val isLoading: Boolean = true,
+    val dailySummary: DailySummary? = null,
+    val error: String? = null,
+    val currentDate: String = SimpleDateFormat("EEEE d MMMM yyyy", Locale.FRENCH).format(Date())
+)
 
-/**
- * ViewModel principal de l'application
- */
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: SmartAgendaRepository,
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
-
-    private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading)
+    
+    private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
-
-    private val _selectedDate = MutableStateFlow(LocalDate.now())
-    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
-
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    val isConfigured: Flow<Boolean> = preferencesManager.isConfiguredFlow
-
+    
     init {
-        viewModelScope.launch {
-            preferencesManager.isConfiguredFlow.collect { configured ->
-                android.util.Log.d("MainViewModel", "isConfigured = $configured")
-                if (configured) {
-                    loadDailySummary()
-                } else {
-                    _uiState.value = MainUiState.NotConfigured
-                }
-            }
-        }
-    }
-
-    fun loadDailySummary(date: LocalDate = _selectedDate.value) {
-        viewModelScope.launch {
-            _uiState.value = MainUiState.Loading
-            
-            repository.getDailySummary(date).collect { result ->
-                result.onSuccess { summary ->
-                    _uiState.value = MainUiState.Success(summary)
-                    _isRefreshing.value = false
-                }.onFailure { error ->
-                    _uiState.value = MainUiState.Error(
-                        error.message ?: "Erreur de connexion. Vérifiez votre VPN."
-                    )
-                    _isRefreshing.value = false
-                }
-            }
-        }
-    }
-
-    fun refresh() {
-        _isRefreshing.value = true
+        Log.d("MainViewModel", "ViewModel créé - chargement initial des données")
         loadDailySummary()
     }
-
-    fun selectDate(date: LocalDate) {
-        _selectedDate.value = date
-        loadDailySummary(date)
+    
+    fun loadDailySummary(date: String = SimpleDateFormat("yyyy-MM-dd", Locale.FRENCH).format(Date())) {
+        viewModelScope.launch {
+            try {
+                Log.d("MainViewModel", "Chargement du résumé quotidien pour: $date")
+                _uiState.update { it.copy(isLoading = true, error = null) }
+                
+                // Récupérer le résumé en une seule fois (pas de collect infini)
+                repository.getDailySummary(date).first().fold(
+                    onSuccess = { summary ->
+                        Log.d("MainViewModel", "Résumé chargé: ${summary.totalEvents} événements")
+                        _uiState.update { 
+                            it.copy(
+                                isLoading = false,
+                                dailySummary = summary,
+                                error = null
+                            )
+                        }
+                    },
+                    onFailure = { error ->
+                        Log.e("MainViewModel", "Erreur chargement: ${error.message}")
+                        _uiState.update { 
+                            it.copy(
+                                isLoading = false,
+                                error = error.message ?: "Erreur de chargement"
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Exception: ${e.message}", e)
+                _uiState.update { 
+                    it.copy(
+                        isLoading = false,
+                        error = "Erreur: ${e.message}"
+                    )
+                }
+            }
+        }
     }
-
-    fun getLastSyncTime(): Long {
-        return runBlocking { preferencesManager.getLastSyncTimestamp() }
+    
+    fun refresh() {
+        Log.d("MainViewModel", "Actualisation manuelle demandée")
+        loadDailySummary()
     }
 }
-
-
-
-
