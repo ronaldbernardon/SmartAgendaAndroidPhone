@@ -2,24 +2,41 @@ package com.smartagenda.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.google.gson.annotations.SerializedName
 
-// Event data classes
+/**
+ * Event - Convention Kotlin standard (camelCase)
+ * @SerializedName mappe l'API Python (PascalCase)
+ */
 @Entity(tableName = "events")
 data class Event(
-    @PrimaryKey val Id: String,
-    val Title: String,
-    val Description: String?,
-    val Category: String,
-    val Date: String,
-    val Time: String?,
-    val Recurring: Boolean = false,
-    val RecurringPattern: String? = null,
-    val Reminder: String? = null,
-    val NotifyChannel: String = "android",
-    val StartDate: String? = null
+    @PrimaryKey 
+    @SerializedName("Id") val id: String,
+    
+    @SerializedName("Title") val title: String,
+    
+    @SerializedName("Description") val description: String? = null,
+    
+    @SerializedName("Category") val category: String,
+    
+    @SerializedName("Date") val date: String,
+    
+    @SerializedName("Time") val time: String? = null,
+    
+    @SerializedName("Recurring") val recurring: Boolean = false,
+    
+    @SerializedName("RecurringPattern") val recurringPattern: String? = null,
+    
+    @SerializedName("Reminder") val reminder: String? = null,
+    
+    @SerializedName("NotifyChannel") val notifyChannel: String = "android",
+    
+    @SerializedName("StartDate") val startDate: String? = null
 )
 
-// Daily Summary for HomeScreen avec TOUS les champs
+/**
+ * Daily Summary pour HomeScreen
+ */
 data class DailySummary(
     val date: String,
     val events: List<Event>,
@@ -29,10 +46,12 @@ data class DailySummary(
     val congeNom: String? = null,
     val weatherData: WeatherData? = null,
     val uvData: UVData? = null,
-    val lastUpdated: String? = null
+    val lastUpdated: Long? = null
 )
 
-// Weather data avec TOUS les champs
+/**
+ * Weather Data (camelCase)
+ */
 data class WeatherData(
     val tempMin: Double,
     val tempMax: Double,
@@ -42,7 +61,9 @@ data class WeatherData(
     val date: String? = null
 )
 
-// API Response types
+/**
+ * API Response types
+ */
 data class ApiResponse(
     val success: Boolean,
     val message: String? = null
@@ -90,15 +111,21 @@ data class CongeResponse(
     val nom: String? = null
 )
 
+/**
+ * UV Response - API Python snake_case → Kotlin camelCase
+ */
 data class UVResponse(
     val success: Boolean,
-    val uv_data: UVData? = null
+    @SerializedName("uv_data") val uvData: UVData? = null
 )
 
+/**
+ * UV Data - API Python snake_case → Kotlin camelCase
+ */
 data class UVData(
     val date: String,
-    val uvIndex: Double,
-    val levelInfo: UVLevelInfo
+    @SerializedName("uv_index") val uvIndex: Double,
+    @SerializedName("level_info") val levelInfo: UVLevelInfo
 )
 
 data class UVLevelInfo(
@@ -107,10 +134,13 @@ data class UVLevelInfo(
     val protection: String
 )
 
+/**
+ * Weather Response - API Python snake_case → Kotlin camelCase
+ */
 data class WeatherResponse(
     val success: Boolean,
-    val temp_min: Double? = null,
-    val temp_max: Double? = null,
-    val weather_description: String? = null,
+    @SerializedName("temp_min") val tempMin: Double? = null,
+    @SerializedName("temp_max") val tempMax: Double? = null,
+    @SerializedName("weather_description") val weatherDescription: String? = null,
     val icon: String? = null
 )
